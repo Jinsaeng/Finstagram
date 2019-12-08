@@ -6,6 +6,7 @@ import pymysql.cursors
 from functools import wraps
 import time
 
+SALT = 'cs3083'
 app = Flask(__name__)
 app.secret_key = "super secret key"
 IMAGES_DIR = os.path.join(os.getcwd(), "images")
@@ -74,7 +75,7 @@ def loginAuth():
     if request.form:
         requestData = request.form
         username = requestData["username"]
-        plaintextPasword = requestData["password"]
+        plaintextPasword = requestData["password"] + SALT
         hashedPassword = hashlib.sha256(plaintextPasword.encode("utf-8")).hexdigest()
 
         with connection.cursor() as cursor:
