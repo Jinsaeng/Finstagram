@@ -1,0 +1,30 @@
+<html>
+<body>
+Create a new Post
+<form action="/post" method="POST">
+    <input type="file" name="imageToUpload" accept="image/*" required></br>
+    <input type="text" name = "caption" placeholder="caption"/> </br>
+    <br>
+Show to all followers?
+    <input type="checkbox" name = "allFollowers" placeholder="post" /> </br>
+    {% for line in group_list%}
+    <input type="checkbox" name="groupName" value={{line.groupName}}>{{line.groupName}}</input>
+    <br>
+    {% endfor %}
+    <br>
+    <input type="submit" value = Post />
+</form>
+
+
+<a href="/show_photos">View Posts</a><br>
+<a href="/view_group">View Groups</a><br>
+<a href="/tagpage">Tag Someone</a> <br>
+<a href="/home">Return Home</a>
+
+<br>
+<a href="/logout">Logout</a>
+
+</body>
+
+
+</html>

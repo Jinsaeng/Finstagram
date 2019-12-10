@@ -1,0 +1,56 @@
+<html>
+<body>
+
+<style type="text/css">
+	table, th, td{
+		border: 1px solid black;
+	}
+</style>
+
+Here are your posts:
+<br>
+
+<table>
+    	<th>PhotoID</th>
+	<th>PostingTime</th>
+    	<th>PhotoLink</th>
+ 	<th>Name</th>
+   	<th>Caption</th>
+	<th>Tagged</th>
+	<th>Likes</th>
+
+{% for line in posts %}
+	<tr>
+	<td>{{line.photoID}}</td>
+	<td>{{line.postingdate}}</td>
+        <td><img src="/image/{{line.filePath}}" width="300"/></td>
+        <td>{{line.firstname + " " + line.lastname}}</td>
+        <td>{{line.caption}}</td>
+	<td>
+	{% for line in tags %}
+		{{line.username + " " + line.firstname + " " + line.lastname}}
+		<br>
+	
+	{% endfor %}
+	</td>
+
+	<td>
+	{% for line in likes %}
+		{{line.username + " " + line.rating}}
+		<br>
+	{% endfor %}
+
+	</td>
+	</tr>
+{% endfor %}
+
+
+</table>
+<br>
+<a href="/postpage">Make a Post</a><br>
+<a href="/show_photos">Show posts</a><br>
+<a href="/home">Return home</a>
+<br>
+<a href="/logout">Logout</a>
+</body>
+</html>

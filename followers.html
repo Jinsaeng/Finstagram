@@ -1,0 +1,54 @@
+<html>
+<body>    
+
+<style type="text/css">
+	table, th, td{
+		border: 1px solid black;
+	}
+</style>
+
+
+Follow Requests:
+<br>
+<form action="/follow_requests" method="GET">
+
+    {% for line in request_list %}
+    	Username: {{line.username_follower}}
+	<input type="radio" name="followRequest" value={{line.username_followed}}>{{line.username_followed}}</input>
+    <br>
+    {% endfor %}
+    <br>
+    <br>
+    <input type="radio" name="accept" value="accept" checked> accept<br>
+    <input type="radio" name="accept" value="decline" checked> decline<br>
+    <input type="submit" name="submit" value="submit">
+ 
+</form>
+
+<br>
+Your Followers:
+
+<table>
+	<th>Followers</th>
+
+{% for line in follower_list %}
+	<tr>
+		<td>{{line.username_follower}}</td>
+
+	</tr>
+
+{% endfor %}
+</table>
+
+ {% if error %}
+        <p class="error"><strong>Error:</strong> {{error}}</p>
+    {% endif %}
+
+
+<br>
+<a href="/follow_page">Follow/Unfollow A User </a><br>
+<a href="/home">Return Home</a>
+<br>
+<a href="/logout">Logout</a>
+</body>
+</html>

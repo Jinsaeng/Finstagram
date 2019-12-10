@@ -1,0 +1,32 @@
+<html>
+<body>
+
+   Tag Requests:<br>
+
+<form action="/manage_tags" method="GET">
+
+    {% for line in tag_list%}
+<br>
+    Username: <line.photoPoster><br>
+    Image: <img src="/image/{{line.filePath}}" width="300"/><br>
+    <input type="radio" name="tagRequest" value={{line.photoID}}>{{line.photoID}}</input>
+<br>
+    {% endfor %}
+<br>
+    <input type="radio" name="accept" value="accept" checked> accept<br>
+    <input type="radio" name="accept" value="decline" checked> decline<br>
+    <input type="submit" name="submit" value="submit">
+</form>
+
+
+<br>
+<a href="/tagpage">Tag a User</a><br>
+<a href="/home">Return Home</a>
+<br>
+
+<a href="/logout">Logout</a>
+
+</body>
+
+
+</html>

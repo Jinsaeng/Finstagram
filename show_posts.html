@@ -1,0 +1,32 @@
+<html>
+<body>
+
+<style type="text/css">
+	table, th, td{
+		border: 1px solid black;
+	}
+</style>
+
+Here are your quick view posts:
+<br>
+
+<table>
+	<th>PhotoID</th>
+	<th>Photo</th>
+    	<th>Username</th>
+
+
+{% for line in posts %}
+	<tr>
+		<td>{{line.photoID}}</td>
+		<td><img src="/image/{{line.filePath}}" width="300"/></td>
+		<td>{{line.username}}</td>
+
+	</tr>
+{% endfor %}
+</table>
+<br>
+<a href="/additional_info">Show additional informations</a><br>
+<a href="/postpage">Make a Post</a><br>
+<a href="/home">Back to home</a><br>
+<a href="/logout">Logout</a>

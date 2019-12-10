@@ -1,0 +1,51 @@
+<html>
+<head>
+
+<h1>Welcome {{username}}</h1> 
+</head>
+<style type="text/css">
+	table,th,td{
+		border:1px solid black;
+}
+</style>
+<body>
+Your posts:
+<br>
+<table>
+	<th>PhotoID</th>
+	<th>PostingDate</th>
+	<th>Image</th>
+	<th>Caption</th>
+
+	{% for line in posts %}
+	<tr>
+		<td>{{line.photoID}}</td>
+		<td>{{line.postingdate}}</td>
+		<td><img src="/image/{{line.filepath}}" width="300"/></td>
+		<td>{{line.caption}}</td>
+	<tr>
+	{% endfor %}
+
+</table>
+
+Actions: <br>
+
+<a href="/postpage">Make a Post</a><br>
+<a href="/show_photos">Show Posts</a> <br>
+<br>
+<a href="/view_group">Show Groups</a> <br>
+<a href="/groups">Manage Groups</a> <br>
+<br>
+<a href="/tagpage">Tag Someone</a> <br>
+<a href="/tag_requests">Manage Tags</a> <br>
+<br>
+<a href="/followers">View followers/Follow Requests</a><br>
+<a href="/follow_page">Follower/Unfollow A User </a><br>
+
+<br>
+<a href="/logout">Logout</a>
+
+</body>
+
+
+</html>

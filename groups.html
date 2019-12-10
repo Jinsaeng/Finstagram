@@ -1,0 +1,33 @@
+<html>
+<body>
+<form action="/create_group" method="POST">
+  
+    Create Group:
+    <input type="text" name = "groupName" placeholder="Group Name" required/> </br>
+    <input type="text" name = "desc" placeholder = "Description" required/><br>
+    <input type="submit" value = Create Group />
+    {% if error %}
+        <p class="error"><strong>Error:</strong> {{error1}}</p>
+    {% endif %}
+</form>
+<br>
+<form action="/add_group" method="POST">
+    
+    Add to Group: </br>
+    <input type="text" name = "groupName" placeholder="Group Name" required/> </br>
+    <input type="text" name = "addUser" placeholder="Username to Add" required/> </br>
+    <input type="submit" value = Add to Group />
+    {% if error %}
+        <p class="error"><strong>Error2:</strong> {{error2}}</p>
+    {% endif %}
+</form>
+<br>
+<a href="/view_group">View Groups</a><br>
+<a href="/home">Return Home</a>
+<br>
+<a href="/logout">Logout</a>
+
+</body>
+
+
+</html>

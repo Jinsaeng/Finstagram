@@ -1,0 +1,33 @@
+<html>
+<body>
+
+<form action = "/follow" method = "POST">
+
+Follow:
+	<input type="text" name="followee" placeholder= "Username" required/> <br>
+	<input type = "submit" value = Send Request />
+ {% if error %}
+        <p class="error"><strong>Error:</strong> {{error}}</p>
+    {% endif %}
+</form>
+
+<form action = "/unfollow" method = "POST">
+Unfollow:
+    <input type="text" name = "unfollowUser" placeholder="Username" required/> </br>
+    <input type="submit" value = Send Request />
+ {% if error %}
+        <p class="error"><strong>Error:</strong> {{error}}</p>
+    {% endif %}
+
+</form>
+
+<br>
+<a href="/followers">Manage follow requests/View followers</a><br>
+<a href="/home">Return Home</a>
+<br>
+<a href="/logout">Logout</a>
+
+</body>
+
+
+</html>

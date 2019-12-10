@@ -1,0 +1,46 @@
+<html>
+
+<body>
+<style type="text/css">
+	table,th,td{
+		border:1px solid black;
+}
+</style>
+
+Here are the groups you own:
+<br>
+<table>
+	<th>Group Name</th>
+{% for line in owned %}
+	<tr>
+		<td>{{line.groupName}}</td>
+
+	</tr>
+{% endfor %}
+</table>
+<br>
+
+Here are the groups you are a member of:
+<br>
+<table>
+	<th>Group Name</th>
+
+{% for line in group_list %}
+	<tr>
+		<td>{{line.groupName}}</td>
+
+	</tr>
+{% endfor %}
+</table>
+<br>
+
+
+<a href="/groups">Manage Groups</a><br>
+<a href="/home">Return Home</a>
+<br>
+<a href="/logout">Logout</a>
+
+</body>
+
+
+</html>
