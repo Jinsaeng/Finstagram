@@ -366,7 +366,7 @@ def tag():
 def tag_requests():
     username = session['username']
     cursor = conn.cursor();
-    query = 'SELECT photoPoster, filepath, photo.PhotoID  FROM tagged LEFT JOIN photo ON (photo.photoPoster = tagged.username) WHERE username=%s AND tagstatus=0'
+    query = 'SELECT photoPoster, filepath, photo.PhotoID  FROM tagged LEFT JOIN photo USING (photoID) WHERE tagged.username = %s AND tagstatus=0'
     cursor.execute(query,username)
     data = cursor.fetchall()
     if not data:
@@ -432,7 +432,7 @@ def follow_requests(): #active
     conn.commit()
     cursor.close()
     return redirect(url_for('followers'))
-#end of tag stuff
+#end of follow stuff
 
 
 ##additional features
@@ -464,8 +464,10 @@ def unfollow():
     cursor.execute(query, (unfollowUser,username))
     query = 'UPDATE follow SET followstatus = 0 WHERE username_followed = %s AND username_follower = %s'
     cursor.execute(query, (unfollowUser,username))
-    query = 'DELETE FROM tagged WHERE tagstatus = 1 WHERE username =%s'
-    cursor.execut(query, username)
+    query = 'DELETE FROM follow WHERE username_followed = %s AND username_follower = %s'
+    cursor.execute(query, (unfollowUser, username))
+    query = 'DELETE FROM tagged WHERE tagstatus = 1 AND username =%s'
+    cursor.execute(query, username)
     return redirect(url_for('follow_requests'))
 #Feature 2: The tag management system, where tag scenarios are provided and resolved. Also the program will show
 #tag attributes, like current requests, relevant data about proposed tagged photos, and etc. -Anthony
