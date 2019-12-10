@@ -11,7 +11,7 @@ app = Flask(__name__)
 app.secret_key = "super secret key"
 IMAGES_DIR = os.path.join(os.getcwd(), "images")
 
-connection = pymysql.connect(host="localhost",
+conn = pymysql.connect(host="localhost",
                              user="root",
                              password="",
                              db="finstagram",
@@ -40,7 +40,13 @@ def index():
 @app.route("/home")
 @login_required
 def home():
-    return render_template("home.html", username=session["username"])
+    username = session['username']
+    cursor = conn.cursor()
+    query = 'SELECT photoID, postingdate, filepath, caption FROM Photo WHERE photoPoster = %s'
+    cursor.execute(query, username)
+    photos = cursor.fetchall()
+    cursor.close()
+    return render_template("home.html", username=username, posts = photos)
 
 @app.route("/upload", methods=["GET"])
 @login_required
@@ -51,7 +57,7 @@ def upload():
 @login_required
 def images():
     query = "SELECT * FROM photo"
-    with connection.cursor() as cursor:
+    with conn.cursor() as cursor:
         cursor.execute(query)
     data = cursor.fetchall()
     return render_template("images.html", images=data)
@@ -75,12 +81,12 @@ def loginAuth():
     if request.form:
         requestData = request.form
         username = requestData["username"]
-        plaintextPasword = requestData["password"] + SALT
-        hashedPassword = hashlib.sha256(plaintextPasword.encode("utf-8")).hexdigest()
+        plaintextPassword = requestData["password"]
+        #hashedPassword = hashlib.sha256(plaintextPasword.encode("utf-8")).hexdigest()
 
-        with connection.cursor() as cursor:
+        with conn.cursor() as cursor:
             query = "SELECT * FROM person WHERE username = %s AND password = %s"
-            cursor.execute(query, (username, hashedPassword))
+            cursor.execute(query, (username, plaintextPassword))
         data = cursor.fetchone()
         if data:
             session["username"] = username
@@ -98,14 +104,15 @@ def registerAuth():
         requestData = request.form
         username = requestData["username"]
         plaintextPasword = requestData["password"]
-        hashedPassword = hashlib.sha256(plaintextPasword.encode("utf-8")).hexdigest()
+        #hashedPassword = hashlib.sha256(plaintextPasword.encode("utf-8")).hexdigest()
         firstName = requestData["fname"]
         lastName = requestData["lname"]
+        bio = requestData["bio"]
         
         try:
-            with connection.cursor() as cursor:
-                query = "INSERT INTO person (username, password, fname, lname) VALUES (%s, %s, %s, %s)"
-                cursor.execute(query, (username, hashedPassword, firstName, lastName))
+            with conn.cursor() as cursor:
+                query = "INSERT INTO person (username, password, firstName, lastName, bio) VALUES (%s, %s, %s, %s, %s)"
+                cursor.execute(query, (username, plaintextPasword, firstName, lastName,bio))
         except pymysql.err.IntegrityError:
             error = "%s is already taken." % (username)
             return render_template('register.html', error=error)    
@@ -129,7 +136,7 @@ def upload_image():
         filepath = os.path.join(IMAGES_DIR, image_name)
         image_file.save(filepath)
         query = "INSERT INTO photo (timestamp, filePath) VALUES (%s, %s)"
-        with connection.cursor() as cursor:
+        with conn.cursor() as cursor:
             cursor.execute(query, (time.strftime('%Y-%m-%d %H:%M:%S'), image_name))
         message = "Image has been successfully uploaded."
         return render_template("upload.html", message=message)
@@ -137,17 +144,24 @@ def upload_image():
         message = "Failed to upload image."
         return render_template("upload.html", message=message)
     
-if __name__ == "__main__":
-    if not os.path.isdir("images"):
-        os.mkdir(IMAGES_DIR)
-    app.run()
+
 
 
 #end of login info
-
+@app.route('/postpage', methods = ['GET'])
+def postpage():
+    username = session['username']
+    cursor = conn.cursor()
+    query = 'SELECT groupName FROM friendGroup WHERE groupOwner=%s'
+    cursor.execute(query, username)
+    data = cursor.fetchall()
+    cursor.close()
+    return render_template('postpage.html', group_list=data)
+        
 
 #posting
 @app.route('/post', methods =['GET','POST'])
+@login_required
 def post():
     username = session['username']
     cursor = conn.cursor()
@@ -162,60 +176,68 @@ def post():
         af = 0
     
     if af == 0 and groupName: # share to group members
-        query = 'INSERT INTO sharewith (groupName, groupOwner, photoID) VALUES(%s,%s,LAST_INSERT_ID())' #find last inserted value
+        query = 'INSERT INTO sharedwith (groupName, groupOwner, photoID) VALUES(%s,%s,LAST_INSERT_ID())' #find last inserted value
         for i in groupName:
             cursor.execute(query,(i,username))
-
+    #image info
     if request.files:
-        #image info
         image_file = request.files.get("imageToUpload", "")
         image_name = image_file.filename 
         filepath = os.path.join(IMAGES_DIR, image_name)
         image_file.save(filepath) #filepath info
         #insert photo into posts
-        query = 'INSERT INTO photo (photoID, photoPoster,filePath,allFollowers,caption) VALUES(NULL,%s,%s,%s,%s )'
+        query = 'INSERT INTO photo (photoID, photoPoster,filePath,allFollowers,caption) VALUES(LAST_INSERT_ID(),%s,%s,%s,%s )'
         #photoID should be auto increment(?)
         cursor.execute(query, (username, filepath, af, caption))
-        message = "Image successfully posted!"
         conn.commit()
         cursor.close()
-        return render_template("postpage.html", message=message)
+        return render_template("postpage.html")
     else:
-        message = "Failed to post image."
-        cusor.close()
-        return render_template("postpage.html", message=message)
+        cursor.close()
+        return render_template("postpage.html")
 
 
 #show photos
 @app.route('/show_photos')
+@login_required
 def show_photos(): #show quick information
-    username = ['username']
+    username = session['username']
     cursor = conn.cursor()
-    query = 'SEELCT photoID, username, filepath FROM Photo JOIN Person USING (username) JOIN sharedwith USING (photoID) JOIN belongto USING (groupName) WHERE  (followstatus = 1 AND follow.username_follower = %s) OR (belongto.groupName = sharedwith.groupName AND belongto.member_username = %s) ORDER BY DESC'
+    query = 'SELECT photoID, filepath, photoPoster FROM Photo JOIN follow ON (follow.username_followed = photo.photoPoster) LEFT JOIN sharedwith USING (photoID) LEFT JOIN belongto USING (groupName) WHERE (followstatus = 1 AND follow.username_follower = %s) OR (belongto.groupName = sharedwith.groupName AND belongto.member_username = %s) ORDER BY postingdate DESC'
     cursor.execute(query, (username, username))
     photos = cursor.fetchall()
     cursor.close()
-    return render_template('photos.html', posts = photos)
+    return render_template('show_posts.html', posts = photos)
 
 @app.route('/additional_info', methods= ['GET'])
+@login_required
 def additional(): #requirements for query, follow infromation is correct OR the person belongs to a group that it is shared to
-    username = ['username']
+    username = session['username']
     cursor = conn.cursor()
-    query = 'SELECT photo.photoID, photo.postingdate, photo.filepath, person.firstname, person.lastname, photo.caption, tagged.username, tagged.firstname, tagged.lastname, liked.username, likes.rating FROM photo JOIN person USING (photo.photoPoster = person.firstName) JOIN tagged USING (photoID) JOIN likes USING (photoID) JOIN follow USING (username_follower = person.username) JOIN belongto USING (member_username) JOIN sharedwith USING photoID WHERE ((photo.AllFollowers =1 AND follow.followstatus = 1 AND follow.username_follower = %s) OR (member_username = %s AND belongto.groupName = sharedwith.groupName)) GROUP BY photoID, ORDER BY DESC '
+    query = 'SELECT photo.photoID, photo.postingdate, photo.filepath, person.firstname, person.lastname, photo.caption FROM photo LEFT JOIN person ON (photo.photoPoster = person.username) LEFT JOIN tagged USING (photoID) LEFT JOIN likes USING (photoID) LEFT JOIN follow ON (follow.username_follower = person.username) LEFT JOIN belongto ON (belongto.member_username = person.username) LEFT JOIN sharedwith USING (photoID) WHERE (followstatus = 1 AND follow.username_follower = %s) OR (belongto.groupName = sharedwith.groupName AND belongto.member_username = %s) GROUP BY photoID ORDER BY postingdate DESC'
+    taggedq = 'SELECT tagged.username, person.firstname, person.lastname FROM tagged LEFT JOIN person USING (username) LEFT JOIN photo USING (photoID) WHERE tagstatus = 1'
+    likedq = 'SELECT likes.username, likes.rating FROM likes LEFT JOIN person USING (username) LEFT JOIN photo USING (photoID) WHERE rating is NOT NULL'
     cursor.execute(query, (username, username))
     data = cursor.fetchall()
+    cursor.execute(taggedq)
+    data2 = cursor.fetchall()
+    cursor.execute(likedq)
+    data3 = cursor.fetchall()
     cursor.close()
-    return render_template('photos.html',posts = data)
+    return render_template('additional_info.html',posts = data, tags = data2, likes = data3)
 #photo information ends
 
 #shows add and create group functions
 @app.route('/groups')
+@login_required
 def groups():
     username = session['username']
     return render_template('groups.html')
 
 @app.route('/create_group', methods = ['GET', 'POST'])
+@login_required
 def create_group():
+    
     username=session['username']
     groupName = request.form['groupName']
     desc = request.form['desc']
@@ -225,71 +247,92 @@ def create_group():
     cursor.execute(query, (username, groupName))
     data = cursor.fetchall()
     if data: #if data has any value means already existing
-        error = 'exists'
+        error1 = 'Group already exists'
         cursor.close()
-        return render_template('groups.html', error=error, group_list=data)
+        return render_template('groups.html', error1=error, group_list=data)
     else: #create new group
         error = None
-        query = 'INSERT INTO friendgroup (groupOwner, groupName, desc) VALUES (%s, %s, %s)'
-        cursor.execute(query,(user, groupName, desc))
+        query = 'INSERT INTO friendgroup (groupOwner, groupName, description) VALUES (%s, %s, %s)'
+        cursor.execute(query,(username, groupName, desc))
+        query2 = 'INSERT INTO belongto (member_username, owner_username, groupName) VALUES (%s, %s, %s)'
+        cursor.execute(query2, (username, username, groupName))
         conn.commit()
         cursor.close()
         return redirect(url_for("groups"))
     
 @app.route('/add_group', methods = ['GET', 'POST'])
+@login_required
 def add_group(): #add a person to the group
     username = session['username']
     groupName = request.form['groupName']
-    adduser = request.form['addUser']
+    addUser = request.form['addUser']
     cursor = conn.cursor()
     #find person, find group
     #check if person already belongs to group
     queryP = 'SELECT * FROM person WHERE username = %s'
     queryG = 'SELECT * FROM friendgroup WHERE groupOwner = %s AND groupName = %s'
     queryB = 'SELECT * FROM belongto WHERE owner_username = %s AND groupName = %s AND member_username = %s'
+    queryO = 'SELECT groupOwner FROM friendgroup WHERE groupName=%s'
 
-    cursor.execute(queryP, username)
+    cursor.execute(queryP, addUser)
     data = cursor.fetchall()
     if (not data): #empty = no person
         error = 'Person can not be found'
-        return render_template('groups.html', error = error,group_list=data)
+        return render_template('groups.html', error2 = error, group_list=data)
     cursor.execute(queryG, (username, groupName))
     data = cursor.fetchall()
     if not data: #no group name
         error = 'Group can not be found'
-        return render_template('groups.html', error = error, group_list=data)
-    cursor.execute(queryB, (username, groupName, adduser))
+        return render_template('groups.html', error2 = error, group_list=data)
+    cursor.execute(queryB, (username, groupName, addUser))
     data = cursor.fetchall()
-    if not data: #person exists, groupname exists, but this person is already in this group
+    if data: #person exists, groupname exists, but this person is already in this group
         error = 'Person is already in this group!'
-        return render_template('groups.html', error = error, group_list=data)
-    #if all check pass...
-    query = 'INSERT INTO Belongto VALUES (%s,%s,%s)'
-    cursor.execute(query (groupName, username, adduser))
+        return render_template('groups.html', error2 = error, group_list=data) #errors do not show, but duplicates are not added
+    cursor.execute(queryO, (groupName))
+    data = cursor.fetchall()
+    if data != username: #not the owner
+        error = 'You are not the owner!'
+        return render_template('groups.html', error2 = error, group_list=data)
+     #if all check pass...
+    query = 'INSERT INTO Belongto (member_username, owner_username, groupName) VALUES (%s,%s,%s)'
+    cursor.execute(query, (addUser, username, groupName))
     conn.commit()
     cursor.close()
     return redirect(url_for("groups"))
 
 @app.route('/view_group', methods = ['GET'])
-def view_group():
+@login_required
+def view_group(): #groups you are a part of
     username = session['username']
     cursor = conn.cursor()
-    query= 'SELECT groupName FROM friendgroup WHERE groupOwner=%s'
-    cursor.execute(query,username)
+    query= 'SELECT groupName FROM belongto WHERE member_username=%s AND owner_username != %s'
+    cursor.execute(query,(username,username))
     data=cursor.fetchall()
+    query2= 'SELECT groupName FROM friendgroup WHERE groupOwner=%s'
+    cursor.execute(query2,username)
+    data2= cursor.fetchall()
     cursor.close()
-    return render_template('view_group.html',posts=data)
+    return render_template('view_group.html',owned = data2, group_list=data)
 #end of group stuff
 
 #tag stuff
 #shows page for tagging people
 @app.route('/tagpage')
+@login_required
 def tagpage():
     username = session['username']
-
-    return render_template('tagpage.html')
+    cursor = conn.cursor()
+    query = 'SELECT photoPoster, filepath, photo.PhotoID  FROM tagged LEFT JOIN photo ON (photo.photoPoster = tagged.username) WHERE username=%s AND tagstatus=0'
+    cursor.execute(query,username)
+    data = cursor.fetchall()
+    if data:
+        return render_template('tagpage.html')
+    else:
+        return render_template('tagpage.html', error = 'No recent tag requests')
 
 @app.route('/tag' , methods= ['GET', 'POST'])
+@login_required
 def tag():
     username = session['username']
     photoID = request.form['photoID']
@@ -303,45 +346,59 @@ def tag():
         error = 'Tag request already exists!'
         return render_template('tagpage.html', error= error)
     #check if the tagged person is allowed to view the photo to be tagged in
-    query = 'SELECT * FROM photo JOIN follow USING (photo.photoPoster = follow.username_follower) JOIN belongto ON (member_username = photo.photoPoster) JOIN sharedwith USING photoID WHERE (follow.followstatus = 1 AND follow.username_follower = %s) OR (sharedwith.groupName = belongto.groupName AND belongto.groupName = %s)'
+    query = 'SELECT * FROM photo LEFT JOIN follow ON (photo.photoPoster = follow.username_followed) LEFT JOIN belongto ON (belongto.owner_username = photo.photoPoster) LEFT JOIN sharedwith USING (photoID)WHERE (follow.followstatus = 1 AND follow.username_follower = %s AND photo.allFollowers = 1) OR (sharedwith.groupName = belongto.groupName AND belongto.member_username = %s)'
     cursor.execute(query, (username, username))
     data = cursor.fetchall()
-    if not data:
-        error = 'Person can not be tagged'
+    if not data: #finds if followed and followstatus
+        error = 'Person can not be tagged' #person cannot be tagged (invisible photo)
         return render_template('tagpage.html', error= error)
-    query = 'INSERT INTO tagged VALUES (%s,%s,%s)'
-    if username == tagUser:
+    query = 'INSERT INTO tagged (username, photoID, tagstatus) VALUES (%s,%s,%s)'
+    if username == tagUser: #self tag
         cursor.execute(query (username, photoID, 1))
-    else:
+    else: #photo is visible and tag
         cursor.execute(query (username, photoID, 0))
     conn.commit()
     cursor.close()
     return redirect(url_for('tagpage'))
 
 @app.route('/tag_requests', methods = ['GET', 'POST'])
+@login_required
 def tag_requests():
     username = session['username']
     cursor = conn.cursor();
-    query = 'SELECT photoPoster, filepath, PhotoID  FROM tagged LEFT JOIN photo ON (photo.photoPoster = tagged.username) WHERE username=%s AND tagstatus=0'
+    query = 'SELECT photoPoster, filepath, photo.PhotoID  FROM tagged LEFT JOIN photo ON (photo.photoPoster = tagged.username) WHERE username=%s AND tagstatus=0'
     cursor.execute(query,username)
     data = cursor.fetchall()
-    cursor.close()
-    return render_template('tag_requests.html', tag_list=data)
+    if not data:
+        return redirect(url_for('tagpage'))
+    else:
+        cursor.close()
+        return render_template('tag_requests.html', tag_list=data)
 #end of tag stuff
 
 #following stuff
-@app.route('/followers', methods = ['GET'])
+
+@app.route('/follow_page')
+def follow_page():
+    username = session['username']
+    return render_template('follow_page.html')
+
+@app.route('/followers')
+@login_required
 def followers(): #viewing followers
     username = session['username']
     cursor = conn.cursor()
     query = 'SELECT username_follower FROM follow WHERE username_followed = %s AND followstatus =1'
-    cursor.execute(query (username))
+    query2 = 'SELECT username_follower FROM follow WHERE username_followed = %s AND followstatus = 0'
+    cursor.execute(query, username)
     data = cursor.fetchall()
-    cursor.close()
-    return render_template('followers.html', follower_list=data)
+    cursor.execute(query2, username)
+    data2 = cursor.fetchall()
+    return render_template('followers.html', follower_list=data, request_list = data2)
 
 @app.route('/follow', methods= ['GET', 'POST'])
-def follow():
+@login_required
+def follow(): #active
     username = session['username']
     followee = request.form['followee']
     cursor = conn.cursor();
@@ -351,20 +408,18 @@ def follow():
     data = cursor.fetchall()
     if (not data):
         error = "Person does not exist"
-        return render_template('followpage.html', error=error)
+        return render_template('follow_page.html', error=error)
     elif (username == followee):
         error = "You cannot follow yourself"
-        return render_template('followpage.html', error=error)
+        return render_template('follow_page.html', error=error)
     else:
-        query = 'INSERT INTO follow VALUES(%s, %s,0)'
+        query = 'INSERT INTO follow (username_followed, username_follower, followstatus) VALUES(%s, %s,0)'
         cursor.execute(query, (username,followee))
-        conn.commit()
-        cursor.close()
-        return redirect(url_for('followpage'))
+        return redirect(url_for('follow_page'))
     
 #manage follows
 @app.route('/follow_requests', methods = ['GET', 'POST'])
-def follow_requests(): #this should only show up when 
+def follow_requests(): #active
     username = session['username']
     follow_request = request.args['followRequest']
     accept = request.args['accept']
@@ -377,12 +432,18 @@ def follow_requests(): #this should only show up when
     conn.commit()
     cursor.close()
     return redirect(url_for('followers'))
+#end of tag stuff
 
-#additional features
+
+##additional features
+##additional features
+##additional features
+
 #feature 1 is the unfollow application, where the person can unfollow another user (only if the user is already following
 #them. Also, the program will initiate a change function to remove all the previous tags of the user from the
 #targeted person's posts -Anthony
 @app.route('/unfollow', methods = ['GET', 'POST'])
+@login_required
 #remove all tags?
 def unfollow():
     username= session['username']
@@ -394,24 +455,23 @@ def unfollow():
     data = cursor.fetchall()
     if (not data):
         error = "User does not exist"
-        return render_template("follow.html", error=error)
+        return render_template("follow_page.html", error=error)
     query = 'SELECT * FROM follow  WHERE username_followed = %s AND username_follower = %s AND followstatus = 1'
     cursor.execute(query, (unfollowUser, username))
     if (not data):
         error = "You are currently not following that user"
-        return render_template("follow.html", error=error)
+        return render_template("follow_page.html", error=error)
     cursor.execute(query, (unfollowUser,username))
     query = 'UPDATE follow SET followstatus = 0 WHERE username_followed = %s AND username_follower = %s'
     cursor.execute(query, (unfollowUser,username))
     query = 'DELETE FROM tagged WHERE tagstatus = 1 WHERE username =%s'
     cursor.execut(query, username)
-    conn.commit()
-    cursor.close()
-    return redirect(url_for('followers'))
+    return redirect(url_for('follow_requests'))
 #Feature 2: The tag management system, where tag scenarios are provided and resolved. Also the program will show
 #tag attributes, like current requests, relevant data about proposed tagged photos, and etc. -Anthony
 #manage tags
 @app.route('/manage_tags', methods = ['GET', 'POST'])
+@login_required
 def manage_tags():
     username = session['username']
     tag_Request = request.args['tagRequest']
@@ -428,3 +488,8 @@ def manage_tags():
     conn.commit()
     cursor.close()
     return redirect(url_for('tag_requests'))
+
+if __name__ == "__main__":
+    if not os.path.isdir("images"):
+        os.mkdir(IMAGES_DIR)
+    app.run()
