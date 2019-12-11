@@ -414,7 +414,7 @@ def follow(): #active
         return render_template('follow_page.html', error=error)
     else:
         query = 'INSERT INTO follow (username_followed, username_follower, followstatus) VALUES(%s, %s,0)'
-        cursor.execute(query, (username,followee))
+        cursor.execute(query, (followee,username))
         return redirect(url_for('follow_page'))
     
 #manage follows
@@ -424,21 +424,23 @@ def follow_requests(): #active
     follow_request = request.args['followRequest']
     accept = request.args['accept']
     cursor = conn.cursor()
-    if accept == 'accept':
-        query = 'UPDATE follow SET followstatus = 1 WHERE username_followed =%s AND username_follower = %s'
-    else: #remove the request, do not alert requester
-        query = 'DELETE FROM follow WHERE followstatus = 0 AND username_followed =%s AND username_follower = %s'
-    cursor.execute(query (username, follow_request))
-    conn.commit()
-    cursor.close()
-    return redirect(url_for('followers'))
-#end of follow stuff
+    query = 'SELECT * FROM follow WHERE followstatus = 0 AND username_follower = %s'
+    cursor.execute(query, username)
+    data = cursor.fetchall()
+    if data:
+        if (accept == 'accept'):
+            query = 'UPDATE follow SET followstatus = 1 WHERE username_followed =%s AND username_follower = %s'
+        else: #remove the request, do not alert requester
+            query = 'DELETE FROM follow WHERE followstatus = 0 AND username_followed =%s AND username_follower = %s'
+        cursor.execute(query (username, follow_request))
+        conn.commit()
+        cursor.close()
+        return redirect(url_for('followers'))
+    else:
+        return redirect(url_for('followers'))
 
 
-##additional features
-##additional features
-##additional features
-
+#additional features
 #feature 1 is the unfollow application, where the person can unfollow another user (only if the user is already following
 #them. Also, the program will initiate a change function to remove all the previous tags of the user from the
 #targeted person's posts -Anthony
@@ -458,10 +460,10 @@ def unfollow():
         return render_template("follow_page.html", error=error)
     query = 'SELECT * FROM follow  WHERE username_followed = %s AND username_follower = %s AND followstatus = 1'
     cursor.execute(query, (unfollowUser, username))
+    data = cursor.fetchall()
     if (not data):
         error = "You are currently not following that user"
         return render_template("follow_page.html", error=error)
-    cursor.execute(query, (unfollowUser,username))
     query = 'UPDATE follow SET followstatus = 0 WHERE username_followed = %s AND username_follower = %s'
     cursor.execute(query, (unfollowUser,username))
     query = 'DELETE FROM follow WHERE username_followed = %s AND username_follower = %s'
@@ -495,3 +497,4 @@ if __name__ == "__main__":
     if not os.path.isdir("images"):
         os.mkdir(IMAGES_DIR)
     app.run()
+
